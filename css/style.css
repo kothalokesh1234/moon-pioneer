@@ -1,0 +1,90 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: radial-gradient(1200px 700px at 50% -10%, #141b2e 0%, #05070d 60%);
+  color: #e8ecf4;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+  display: flex; justify-content: center; align-items: flex-start;
+  padding: 18px 12px;
+}
+
+#wrap { width: 984px; max-width: 100%; }
+
+#hud-top {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 6px; gap: 12px;
+}
+.brand { font-size: 22px; font-weight: 800; letter-spacing: 3px; white-space: nowrap; }
+.brand span { color: #ffb03d; }
+.hud-stats { display: flex; gap: 26px; align-items: center; }
+.stat { text-align: right; }
+.stat label { display: block; font-size: 10px; letter-spacing: 2px; color: #8b93a7; }
+.stat b { font-size: 24px; font-variant-numeric: tabular-nums; }
+
+#stage { position: relative; border-radius: 12px; overflow: hidden;
+  border: 1px solid #232a3a; box-shadow: 0 18px 60px rgba(0,0,0,.55); }
+canvas { display: block; width: 100%; height: auto; }
+
+#overlay {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: rgba(4, 6, 12, .82); backdrop-filter: blur(3px);
+  opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 5;
+}
+#overlay.show { opacity: 1; pointer-events: auto; }
+.panel { text-align: center; padding: 34px 48px; max-width: 92%; }
+.panel h1 { font-size: 52px; letter-spacing: 6px; text-shadow: 0 4px 34px rgba(255,176,61,.3); }
+.panel h1 span { color: #ffb03d; }
+.tag { color: #9aa3b8; margin: 8px 0 20px; letter-spacing: 1px; }
+.controls { display: flex; flex-direction: column; gap: 10px; color: #9aa3b8;
+  margin-bottom: 26px; font-size: 14px; line-height: 1.6; }
+kbd {
+  background: #1c2333; border: 1px solid #39415a; border-bottom-width: 3px;
+  border-radius: 6px; padding: 3px 9px; font-family: inherit; font-size: 13px; margin: 0 2px;
+}
+.c-oil { color: #c9a2ff; } .c-ref { color: #7dd7fc; } .c-blk { color: #ffb03d; }
+
+#startBtn {
+  background: #ffb03d; color: #1a1005; border: none; cursor: pointer;
+  font-size: 18px; font-weight: 800; letter-spacing: 2px;
+  padding: 14px 44px; border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(255,176,61,.35);
+  transition: transform .12s, box-shadow .12s;
+}
+#startBtn:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(255,176,61,.55); }
+
+#buildbar {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 4;
+  display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+  padding: 10px; background: rgba(6, 9, 16, .88); border-top: 1px solid #232a3a;
+}
+#buildbar.hidden { display: none; }
+#buildbar button {
+  background: #1c2333; color: #e8ecf4; border: 1px solid #39415a; cursor: pointer;
+  border-radius: 8px; padding: 8px 12px; font-family: inherit;
+  display: flex; flex-direction: column; gap: 2px; min-width: 96px;
+  transition: transform .1s, border-color .1s;
+}
+#buildbar button b { font-size: 13px; }
+#buildbar button span { font-size: 12px; color: #ffb03d; font-variant-numeric: tabular-nums; }
+#buildbar button:hover:not(:disabled) { transform: translateY(-2px); border-color: #ffb03d; }
+#buildbar button:disabled { opacity: .38; cursor: not-allowed; }
+#buildbar button.rocket { border-color: #ff5d5d; }
+#buildbar button.rocket span { color: #ff8d8d; }
+#buildbar button.maxed span { color: #7ee787; }
+
+#toast {
+  position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 6;
+  background: rgba(10, 14, 22, .9); border: 1px solid #39415a;
+  padding: 8px 22px; border-radius: 20px; font-size: 14px; letter-spacing: 1px;
+  opacity: 0; transition: opacity .2s; pointer-events: none; white-space: nowrap;
+}
+#toast.show { opacity: 1; }
+
+#hud-bottom {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 6px; color: #8b93a7; font-size: 13px;
+}
+#warn { color: #ffb03d; font-weight: 800; letter-spacing: 1px; animation: blink .6s steps(2) infinite; }
+#warn.hidden { display: none; }
+@keyframes blink { 50% { opacity: .25; } }
