@@ -63,7 +63,7 @@ const BASE_COST = { collector: 30, treadmill: 40, greenhouse: 50, helper: 60, ba
 function costOf(kind) {
   if (kind === "backpack") return backpackLvl >= 3 ? -1 : Math.round(BASE_COST.backpack * Math.pow(1.8, backpackLvl));
   if (kind === "boots") return bootsLvl >= 2 ? -1 : Math.round(BASE_COST.boots * Math.pow(1.8, bootsLvl));
-  if (kind === "helper") return buyCount.helper >= 3 ? -1 : Math.round(BASE_COST.helper * Math.pow(1.6, buyCount.helper));
+  if (kind === "helper") return buyCount.helper >= 4 ? -1 : Math.round(BASE_COST.helper * Math.pow(1.6, buyCount.helper));
   return Math.round(BASE_COST[kind] * Math.pow(1.6, buyCount[kind]));
 }
 
@@ -71,7 +71,9 @@ function costOf(kind) {
 const PLOTS = [
   { kind: "collector",  x: 250, y: 190, building: null },
   { kind: "collector",  x: 250, y: 430, building: null },
+  { kind: "collector",  x: 110, y: 310, building: null },
   { kind: "treadmill",  x: 440, y: 310, building: null },
+  { kind: "treadmill",  x: 640, y: 470, building: null },
   { kind: "greenhouse", x: 610, y: 175, building: null },
 ];
 const REFINERY = { x: 700, y: 330, oilBuf: 0, prog: 0 };
@@ -132,6 +134,26 @@ function toast(msg, ms = 0) {
   if (ms) toastTimer = setTimeout(() => el.classList.remove("show"), ms);
 }
 
+/* click a helper to switch ferry <-> treadmill duty */
+canvas.addEventListener("click", e => {
+  if (state !== "playing") return;
+  const r = canvas.getBoundingClientRect();
+  const x = (e.clientX - r.left) * (W / r.width);
+  const y = (e.clientY - r.top) * (H / r.height);
+  for (const h of helpers) {
+    if (d2(x, y, h.x, h.y) < 28 * 28) { toggleHelper(h); break; }
+  }
+});
+function toggleHelper(h) {
+  if (h.st === "tired") { toast("Too exhausted — feed them first!", 1500); return; }
+  h.mode = h.mode === "run" ? "ferry" : "run";
+  h.runnerPlot = null;
+  h.carry = 0;
+  h.st = h.mode === "run" ? "torun" : "seek";
+  beep(h.mode === "run" ? 700 : 500, 0.08, "square", 0.04);
+  toast(h.mode === "run" ? "Helper → treadmill duty" : "Helper → ferry duty", 1400);
+}
+
 /* ---------------- Particles ---------------- */
 function puff(x, y, n, col, spd = 90, life = 0.6, size = 4) {
   for (let i = 0; i < n; i++) {
@@ -157,7 +179,8 @@ function buy(kind) {
   else if (kind === "boots") { bootsLvl++; playerSpeed += 35; }
   else if (kind === "helper") {
     buyCount.helper++;
-    helpers.push({ x: REFINERY.x - 40, y: REFINERY.y + 40, tx: 0, ty: 0, carry: 0, st: "seek", t: 0, wait: 0 });
+    helpers.push({ x: REFINERY.x - 40, y: REFINERY.y + 40, tx: 0, ty: 0, carry: 0,
+      st: "seek", t: 0, wait: 0, energy: 100, mode: "ferry", runnerPlot: null, zt: 0 });
   } else {
     const plot = PLOTS.find(p => p.kind === kind && !p.building);
     if (!plot) return false;
@@ -265,9 +288,19 @@ function update(dt, t) {
     if (Math.random() < 0.2) beep(720, 0.05, "square", 0.03);
   }
 
-  /* --- treadmill boost --- */
-  const treadmills = PLOTS.filter(p => p.building && p.kind === "treadmill").length;
-  const boost = 1 + treadmills * 0.5;
+  /* --- treadmill power: helpers physically run on treadmills --- */
+  const builtTreads = PLOTS.filter(p => p.building && p.kind === "treadmill");
+  let runners = 0;
+  for (const h of helpers) {
+    if (h.mode !== "run" || h.st === "tired") { h.runnerPlot = null; continue; }
+    if (!h.runnerPlot || !h.runnerPlot.building) {
+      h.runnerPlot = builtTreads.find(p =>
+        helpers.filter(o => o !== h && o.runnerPlot === p).length < 2) || null;
+      if (!h.runnerPlot) { h.mode = "ferry"; h.st = "seek"; continue; }
+    }
+    runners++;
+  }
+  const boost = 1 + runners * 0.5;
 
   /* --- collectors --- */
   for (const p of PLOTS) {
@@ -305,9 +338,40 @@ function update(dt, t) {
     }
   }
 
-  /* --- helpers: ferry oil collector -> refinery, eat food --- */
+  /* --- helpers: ferry oil, run treadmills, eat food, get tired --- */
   for (const h of helpers) {
     h.t += dt;
+    // stamina: running drains, deliveries cost, food restores
+    if (h.st === "running") h.energy -= 4 * dt;
+    if (h.energy < 25 && food > 0 && h.st !== "tired") {
+      food--; h.energy = Math.min(100, h.energy + 45);
+      puff(h.x, h.y - 20, 4, "126,231,135", 50, 0.5, 3);
+      beep(600, 0.08, "square", 0.04, 900);
+    }
+    if (h.energy <= 0) {
+      h.energy = 0;
+      if (food <= 0 && h.st !== "tired") {
+        h.st = "tired"; h.carry = 0; h.runnerPlot = null;
+        toast("Helper exhausted — grow food!", 1800);
+      }
+    }
+    if (h.st === "tired") {
+      h.zt += dt;
+      if (h.zt > 1.4) { h.zt = 0; scorePop(h.x, h.y - 32, "Zzz"); }
+      if (food > 0) {
+        food--; h.energy = 50;
+        h.st = h.mode === "run" ? "torun" : "seek";
+        toast("Helper refueled!", 1200);
+      }
+      continue;
+    }
+    // treadmill duty
+    if (h.mode === "run") {
+      if (!h.runnerPlot) { h.mode = "ferry"; h.st = "seek"; }
+      else if (moveToward(h, h.runnerPlot.x - 10, h.runnerPlot.y - 4, 150, dt)) h.st = "running";
+      else h.st = "torun";
+      continue;
+    }
     if (h.st === "seek") {
       let bestP = null, bestOil = 0;
       for (const p of PLOTS) {
@@ -327,21 +391,13 @@ function update(dt, t) {
       }
     } else if (h.st === "back") {
       if (moveToward(h, h.tx, h.ty, 135, dt)) {
-        if (food <= 0) { h.st = "hungry"; }
-        else {
-          food--;
-          REFINERY.oilBuf += h.carry;
-          scorePop(h.x, h.y - 20, `+${h.carry} oil`);
-          h.carry = 0; h.st = "seek";
-          puff(REFINERY.x, REFINERY.y - 20, 3, "255,176,61", 60, 0.4, 3);
-          beep(760, 0.07, "square", 0.035);
-        }
+        REFINERY.oilBuf += h.carry;
+        scorePop(h.x, h.y - 20, `+${h.carry} oil`);
+        h.carry = 0; h.st = "seek";
+        h.energy = Math.max(0, h.energy - 15);
+        puff(REFINERY.x, REFINERY.y - 20, 3, "255,176,61", 60, 0.4, 3);
+        beep(760, 0.07, "square", 0.035);
       }
-    } else if (h.st === "hungry") {
-      h.tx = REFINERY.x - 40; h.ty = REFINERY.y + 40;
-      moveToward(h, h.tx, h.ty, 100, dt);
-      if (food > 0 && h.carry > 0) { h.st = "back"; h.tx = REFINERY.x; h.ty = REFINERY.y + 34; }
-      else if (food > 0) h.st = "seek";
     } else if (h.st === "idle") {
       moveToward(h, REFINERY.x - 40, REFINERY.y + 40, 100, dt);
       h.wait += dt;
@@ -352,9 +408,9 @@ function update(dt, t) {
   updateParts(dt);
   updateHUD();
 
-  const hungry = helpers.some(h => h.st === "hungry");
+  const tired = helpers.some(h => h.st === "tired");
   const warn = document.getElementById("warn");
-  if (hungry) { warn.textContent = "HELPERS HUNGRY — BUILD GREENHOUSE"; warn.classList.remove("hidden"); }
+  if (tired) { warn.textContent = "HELPERS EXHAUSTED — GROW FOOD"; warn.classList.remove("hidden"); }
   else if (food <= 2 && helpers.length) { warn.textContent = "LOW FOOD"; warn.classList.remove("hidden"); }
   else warn.classList.add("hidden");
 }
@@ -536,7 +592,20 @@ function drawPlot(plot, t) {
       ctx.beginPath(); ctx.moveTo(x - 32 + i * 16 + off, y + 2); ctx.lineTo(x - 32 + i * 16 + off, y + 20); ctx.stroke();
     }
     ctx.fillStyle = "#ffb03d"; ctx.font = "bold 11px sans-serif"; ctx.textAlign = "center";
-    ctx.fillText("+50% SPEED", x, y - 12);
+    ctx.fillText("+50% / RUNNER", x, y - 12);
+    // helpers physically running on the belt
+    const onBelt = helpers.filter(hh => hh.runnerPlot === plot && (hh.st === "running" || hh.st === "torun"));
+    onBelt.forEach((hh, i) => {
+      const rx = x - 14 + i * 28;
+      const bob = Math.abs(Math.sin(t * 10 + i * 2)) * 5;
+      ctx.fillStyle = "rgba(0,0,0,0.25)";
+      ctx.beginPath(); ctx.ellipse(rx, y + 16, 8, 3, 0, 0, 7); ctx.fill();
+      ctx.fillStyle = "#e8933c";
+      ctx.beginPath(); ctx.arc(rx, y - 24 - bob, 7, 0, 7); ctx.fill();
+      ctx.fillRect(rx - 4, y - 18 - bob, 8, 13);
+      ctx.fillStyle = "#182742";
+      ctx.beginPath(); ctx.arc(rx + 2, y - 26 - bob, 3.4, 0, 7); ctx.fill();
+    });
     // runner
     const rx = x + Math.sin(t * 6) * 14;
     ctx.fillStyle = "#e8933c";
@@ -634,13 +703,14 @@ function render(t) {
   drawRefinery(t);
   drawRocket(t);
 
-  // helpers
+  // helpers (runners on treadmills are drawn by the treadmill itself)
   for (const h of helpers) {
-    drawAstronaut(h.x, h.y, 0, "#e8933c", t + h.x, true, h.carry, 0.8);
-    if (h.st === "hungry") {
-      ctx.fillStyle = "#ff5d5d"; ctx.font = "bold 16px sans-serif"; ctx.textAlign = "center";
-      ctx.fillText("!", h.x, h.y - 34);
-    }
+    if (h.st === "running" || h.st === "torun") continue;
+    drawAstronaut(h.x, h.y, 0, h.st === "tired" ? "#9aa3b8" : "#e8933c", t + h.x, h.st !== "tired", h.carry, 0.8);
+    // energy bar
+    ctx.fillStyle = "#12161f"; rr(ctx, h.x - 14, h.y - 44, 28, 5, 2.5); ctx.fill();
+    ctx.fillStyle = h.energy > 25 ? "#7ee787" : "#ff5d5d";
+    rr(ctx, h.x - 14, h.y - 44, 28 * (h.energy / 100), 5, 2.5); ctx.fill();
   }
   // player
   if (state !== "victory") drawAstronaut(player.x, player.y, player.dir, "#fff", t, player.moving, player.carry, 1);
@@ -693,6 +763,12 @@ window.__mp = {
   player, helpers, pools, keys, PLOTS, REFINERY,
   start: startGame,
   buy,
+  toggleHelper,
+  frame(dt) { update(dt); },
   addBlocks(n) { blocks += n; refreshBuildbar(); },
+  setFood(n) { food = n; },
+  getFood() { return food; },
+  getBlocks() { return blocks; },
+  starve() { food = 0; for (const p of PLOTS) if (p.building && p.kind === "greenhouse") p.building.t = 0; },
   setPlanet(i) { planetIdx = i; },
 };
