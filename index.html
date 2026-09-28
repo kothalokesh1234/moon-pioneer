@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Moon Pioneer — Idle Colony Arcade</title>
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="wrap">
+    <header id="hud-top">
+      <div class="brand">MOON <span>PIONEER</span></div>
+      <div class="hud-stats">
+        <div class="stat"><label id="planetName">MOON</label><b id="sol">Sol 1</b></div>
+        <div class="stat"><label>OIL</label><b id="oil">0</b></div>
+        <div class="stat"><label>BLOCKS</label><b id="blocks">0</b></div>
+        <div class="stat"><label>FOOD</label><b id="food">0</b></div>
+      </div>
+    </header>
+
+    <div id="stage">
+      <canvas id="game" width="960" height="600"></canvas>
+
+      <div id="overlay" class="show">
+        <div class="panel">
+          <h1>MOON <span>PIONEER</span></h1>
+          <p class="tag">gather &bull; refine &bull; automate &bull; launch</p>
+          <div class="controls">
+            <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / arrows — move astronaut</div>
+            <div>Walk over <b class="c-oil">oil pools</b> to collect, stand by the <b class="c-ref">refinery</b> to deposit</div>
+            <div>Spend <b class="c-blk">blocks</b> below to build your colony</div>
+          </div>
+          <button id="startBtn">Start Colony</button>
+        </div>
+      </div>
+
+      <div id="buildbar" class="hidden">
+        <button data-buy="collector"><b>Collector</b><span>30 ▦</span></button>
+        <button data-buy="treadmill"><b>Treadmill</b><span>40 ▦</span></button>
+        <button data-buy="greenhouse"><b>Greenhouse</b><span>50 ▦</span></button>
+        <button data-buy="helper"><b>Helper</b><span>60 ▦</span></button>
+        <button data-buy="backpack"><b>Backpack+</b><span>25 ▦</span></button>
+        <button data-buy="boots"><b>Boots+</b><span>25 ▦</span></button>
+        <button data-buy="rocket" class="rocket"><b>🚀 Launch</b><span>150 ▦</span></button>
+      </div>
+
+      <div id="toast"></div>
+    </div>
+
+    <footer id="hud-bottom">
+      <span id="tip">Helpers eat 1 food per delivery — keep the greenhouse running.</span>
+      <span id="warn" class="hidden"></span>
+    </footer>
+  </div>
+
+  <script src="js/game.js"></script>
+</body>
+</html>
